@@ -3,6 +3,16 @@ import { Octokit } from "@octokit/rest";
 import OpenAI from "openai";
 import dotenv from "dotenv";
 
+// types/bug.ts
+interface Bug {
+  id: string;
+  title: string;
+  description: string;
+  bugLines: number[]; // e.g. [34,55]
+  filePath: string;
+  fullCode: string[]; // e.g. ["line 1 of code goes here", "line 2 of code goes here"]
+}
+
 dotenv.config();
 
 const io = new Server(3001, {
@@ -44,7 +54,7 @@ io.on("connection", (socket) => {
         })
         .slice(0, 3);
 
-      const allBugs = [];
+      const allBugs: Bug[] = [];
 
       for (const codeFile of codeFiles) {
         const fileResponse = await octokit.rest.repos.getContent({
@@ -68,11 +78,12 @@ io.on("connection", (socket) => {
   {
     "bugs": [
       {
-        "title": "Brief bug description",
-        "description": "Detailed explanation", 
-        "severity": "high|medium|low",
-        "lineNumber": 42
-        "filePath" ${codeFile.path}
+        id: string;
+        title: string;
+        description: string;
+        bugLines: number[]; // e.g. [startingLineOfBug,endingLineOfBug]
+        filePath: ${codeFile.path};
+        fullCode: string[]; // e.g. ["line 1 of code goes here", "line 2 of code goes here"]
       }
     ]
       "buggy": true | false
