@@ -1,6 +1,9 @@
 import { Server } from "socket.io";
 import { Octokit } from "@octokit/rest";
 import OpenAI from "openai";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const io = new Server(3001, {
   cors: {
@@ -8,11 +11,10 @@ const io = new Server(3001, {
     methods: ["GET", "POST"],
   },
 });
-
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 io.on("connection", (socket) => {
-  console.log("Client connected:", socket.id);
+  console.log("Client connecteddd:", socket.id);
 
   socket.on("analyze-repo", async (repoUrl: string) => {
     try {
@@ -103,4 +105,4 @@ io.on("connection", (socket) => {
   });
 });
 
-console.log("Socket.io server running on port 3001");
+console.log("Socket.io serverr running on port 3001");
