@@ -61,28 +61,36 @@ io.on("connection", (socket) => {
 
       const allBugs: Bug[] = [];
 
-      for (const codeFile of codeFiles) {
-        const fileResponse = await octokit.rest.repos.getContent({
-          owner: repoOwner,
-          repo: repoName,
-          path: codeFile.path!,
+      const batchSize = 10; // Process 10 files at a time
+
+      for (let i = 0; i < codeFiles.length; i += batchSize) {
+        const batch = codeFiles.slice(i, i + batchSize);
+        const batchNumber = Math.floor(i / batchSize) + 1;
+        const totalBatches = Math.ceil(codeFiles.length / batchSize);
+
+        socket.emit("analysis-progress", {
+          message: `Processing batch ${batchNumber}/${totalBatches} (${batch.length} files)...`,
         });
 
-        if (
-          !Array.isArray(fileResponse.data) &&
-          fileResponse.data.type === "file"
-        ) {
-          const fileContent = Buffer.from(
-            fileResponse.data.content,
-            "base64"
-          ).toString();
-
-          socket.emit("analysis-progress", {
-            message: `Running AI analysis on ${codeFile.path}...`,
+        const batchPromises = batch.map(async (codeFile) => {
+          const fileResponse = await octokit.rest.repos.getContent({
+            owner: repoOwner,
+            repo: repoName,
+            path: codeFile.path!,
           });
-          const aiResponse = await client.responses.create({
-            model: "gpt-5-nano",
-            input: `Analyze this code for security vulnerabilities. If the code has no bugs return buggy:false, otherwise return buggy:true.
+
+          if (
+            !Array.isArray(fileResponse.data) &&
+            fileResponse.data.type === "file"
+          ) {
+            const fileContent = Buffer.from(
+              fileResponse.data.content,
+              "base64"
+            ).toString();
+
+            const aiResponse = await client.responses.create({
+              model: "gpt-5-nano",
+              input: `Analyze this code for security vulnerabilities. If the code has no bugs return buggy:false, otherwise return buggy:true.
          Return ONLY valid JSON in this format:
   {
     "bugs": [
@@ -100,11 +108,19 @@ io.on("connection", (socket) => {
   
   Code to analyze:
   ${fileContent}`,
-          });
-          const bugsData = JSON.parse(aiResponse.output_text);
-          console.log("bugsData", bugsData);
-          allBugs.push(...bugsData.bugs);
-          await new Promise((resolve) => setTimeout(resolve, 100)); // 100ms delay
+            });
+
+            return JSON.parse(aiResponse.output_text).bugs;
+          }
+          return [];
+        });
+
+        const batchResults = await Promise.all(batchPromises);
+        allBugs.push(...batchResults.flat());
+
+        // Small delay between batches
+        if (i + batchSize < codeFiles.length) {
+          await new Promise((resolve) => setTimeout(resolve, 200));
         }
       }
       console.log("allBugs", allBugs);
