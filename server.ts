@@ -28,12 +28,16 @@ io.on("connection", (socket) => {
 
   socket.on("analyze-repo", async (repoUrl: string) => {
     try {
-      // Your existing GitHub + OpenAI logic here
+      socket.emit("analysis-progress", { message: "Starting analysis..." });
       const url = new URL(repoUrl);
       const [, repoOwner, repoName] = url.pathname.split("/");
 
       const octokit = new Octokit({
         auth: process.env.GITHUB_TOKEN,
+      });
+
+      socket.emit("analysis-progress", {
+        message: "Fetching repository files...",
       });
 
       const treeResponse = await octokit.rest.git.getTree({
@@ -42,17 +46,18 @@ io.on("connection", (socket) => {
         tree_sha: "HEAD",
         recursive: "true",
       });
+      const codeFiles = treeResponse.data.tree.filter((file) => {
+        return (
+          file.type === "blob" &&
+          (file.path?.endsWith(".js") ||
+            file.path?.endsWith(".tsx") ||
+            file.path?.endsWith(".ts"))
+        );
+      });
 
-      const codeFiles = treeResponse.data.tree
-        .filter((file) => {
-          return (
-            file.type === "blob" &&
-            (file.path?.endsWith(".js") ||
-              file.path?.endsWith(".tsx") ||
-              file.path?.endsWith(".ts"))
-          );
-        })
-        .slice(0, 3);
+      socket.emit("analysis-progress", {
+        message: `Found ${codeFiles.length} code files. Starting security analysis...`,
+      });
 
       const allBugs: Bug[] = [];
 
@@ -71,6 +76,10 @@ io.on("connection", (socket) => {
             fileResponse.data.content,
             "base64"
           ).toString();
+
+          socket.emit("analysis-progress", {
+            message: `Running AI analysis on ${codeFile.path}...`,
+          });
           const aiResponse = await client.responses.create({
             model: "gpt-5-nano",
             input: `Analyze this code for security vulnerabilities. If the code has no bugs return buggy:false, otherwise return buggy:true.
@@ -95,11 +104,14 @@ io.on("connection", (socket) => {
           const bugsData = JSON.parse(aiResponse.output_text);
           console.log("bugsData", bugsData);
           allBugs.push(...bugsData.bugs);
+          await new Promise((resolve) => setTimeout(resolve, 100)); // 100ms delay
         }
       }
       console.log("allBugs", allBugs);
 
       // ... move your existing analysis code here ...
+
+      socket.emit("analysis-progress", { message: "Analysis complete!" });
 
       socket.emit("analysis-complete", {
         name: repoName,
