@@ -90,13 +90,13 @@ io.on("connection", (socket) => {
 
       // ... move your existing analysis code here ...
 
-      //   socket.emit("analysis-complete", {
-      //     name: repoName,
-      //     bugs: allBugs,
-      //     count: fileCount,
-      //   });
-    } catch (error) {
-      socket.emit("analysis-error", { error: error.message });
+      socket.emit("analysis-complete", {
+        name: repoName,
+        bugs: allBugs,
+        count: codeFiles.length,
+      });
+    } catch (error: any) {
+      socket.emit("analysis-error", { error: error.message ?? String(error) });
     }
   });
 
