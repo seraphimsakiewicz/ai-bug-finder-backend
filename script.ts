@@ -7,9 +7,7 @@ interface Bug {
   id: string;
   title: string;
   description: string;
-  bugLines: number[]; // e.g. [34,55]
-  filePath: string;
-  fullCode: string[]; // e.g. ["line 1 of code goes here", "line 2 of code goes here"]
+  lines: number[]; // e.g. [34,55]
 }
 
 dotenv.config();
@@ -78,29 +76,27 @@ for (let i = 0; i < codeFiles.length; i += batchSize) {
 
       const aiResponse = await client.responses.create({
         model: "gpt-5-nano",
-        input: `Analyze this code for security vulnerabilities. If the code has no bugs return buggy:false, otherwise return buggy:true.
+        input: `Analyze this code for security vulnerabilities. If the code has no bugs return an empty array, otherwise return an array of bugs.
          Return ONLY valid JSON in this format:
   {
-    "bugs": [
+    "${codeFile.path}": [
       {
         id: string;
         title: string;
         description: string;
-        bugLines: number[]; // e.g. [startingLineOfBug,endingLineOfBug]
-        filePath: ${codeFile.path};
-        fullCode: string[]; // e.g. ["line 1 of code goes here", "line 2 of code goes here"]
+        lines: number[]; // e.g. [startingLineOfBug,endingLineOfBug]
       }
-    ]
-      "buggy": true | false
+        ]
   }
   
   Code to analyze:
   ${fileContent}`,
       });
 
-      return JSON.parse(aiResponse.output_text).bugs;
+      return JSON.parse(aiResponse.output_text);
+    } else {
+      return [];
     }
-    return [];
   });
 
   const batchResults = await Promise.all(batchPromises);
