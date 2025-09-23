@@ -125,8 +125,6 @@ io.on("connection", (socket) => {
       }
       console.log("allBugs", allBugs);
 
-      // ... move your existing analysis code here ...
-
       socket.emit("analysis-progress", { message: "Analysis complete!" });
 
       socket.emit("analysis-complete", {
