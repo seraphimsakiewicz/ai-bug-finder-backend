@@ -1,6 +1,14 @@
 import { Octokit } from "@octokit/rest";
 import OpenAI from "openai";
 import pLimit from "p-limit";
+import dotenv from "dotenv";
+dotenv.config();
+
+const octokit = new Octokit({
+  auth: process.env.GITHUB_TOKEN,
+});
+
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export type Bug = {
   id: string;
@@ -47,7 +55,7 @@ export function parseRepoUrl(repoUrl: string) {
   return { repoOwner, repoName };
 }
 
-export async function fetchRepoFiles(octokit: Octokit, repoOwner: string, repoName: string) {
+export async function fetchRepoFiles(repoOwner: string, repoName: string) {
   const treeResponse = await octokit.rest.git.getTree({
     owner: repoOwner,
     repo: repoName,
@@ -70,9 +78,7 @@ export function filterCodeFiles(files: any[]) {
   });
 }
 
-export async function processFile(
-  octokit: Octokit,
-  client: OpenAI,
+async function processFile(
   repoOwner: string,
   repoName: string,
   codeFile: any
@@ -169,32 +175,34 @@ export async function processFile(
   }
 }
 
-export async function processAllFiles(
+export async function processFilesWithSocketProgress(
   files: any[],
-  octokit: Octokit,
-  client: OpenAI,
   repoOwner: string,
-  repoName: string
+  repoName: string,
+  socket: any
 ) {
   const limit = pLimit(13);
 
-  return Promise.all(
-    files.map((codeFile, index) =>
+  await Promise.all(
+    files.map((codeFile) =>
       limit(async () => {
-        console.log("analysis-progress", {
-          message: `Processing file ${index + 1}/${files.length}: ${codeFile.path}`,
+        socket.emit("analysis-progress", {
+          message: `Processing ${codeFile.path}`,
         });
 
-        const result = await processFile(octokit, client, repoOwner, repoName, codeFile);
+        const result = await processFile(repoOwner, repoName, codeFile);
 
-        if (!result?.error) {
-          console.log(
-            `File analysis results for ${codeFile.path}: Mock sending to backend here ->`,
-            JSON.stringify(result, null, "\t")
-          );
+        if (!("error" in result)) {
+          // Extract bugs from result (result is { [filePath]: Bug[] })
+          const filePath = Object.keys(result)[0];
+          const bugs = result[filePath];
+
+          // Emit individual file result
+          socket.emit("file-analyzed", {
+            filePath,
+            bugs,
+          });
         }
-
-        return result;
       })
     )
   );
