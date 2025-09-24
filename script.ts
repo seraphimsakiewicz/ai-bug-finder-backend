@@ -35,15 +35,51 @@ const treeResponse = await octokit.rest.git.getTree({
   tree_sha: "HEAD",
   recursive: "true",
 });
+const ignoredDirs = [
+  "node_modules/",
+  "dist/",
+  "build/",
+  "coverage/",
+  ".next/",
+  ".nuxt/",
+  "__snapshots__/",
+  "vendor/",
+  ".venv/",
+  "__pycache__/",
+];
+
+const ignoredExtensions = [
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".svg",
+  ".ico",
+  ".woff",
+  ".woff2",
+  ".ttf",
+  ".eot",
+  ".pdf",
+  ".md",
+  ".txt",
+  ".lock",
+  ".log",
+  ".map",
+];
+
 const codeFiles = treeResponse.data.tree.filter((file) => {
-  return (
-    file.type === "blob" &&
-    (file.path?.endsWith(".js") ||
-      file.path?.endsWith(".tsx") ||
-      file.path?.endsWith(".ts"))
-  );
+  if (file.type !== "blob") return false;
+
+  const path = file.path ?? "";
+
+  // skip ignored directories
+  if (ignoredDirs.some((dir) => path.includes(dir))) return false;
+
+  // skip ignored extensions
+  if (ignoredExtensions.some((ext) => path.endsWith(ext))) return false;
+
+  return true; // keep everything else
 });
-// .slice(0, 5);
 
 console.log("analysis-progress", {
   message: `Found ${codeFiles.length} code files. Starting security analysis...`,
@@ -129,7 +165,8 @@ async function processFile(codeFile: any): Promise<any> {
       const parsedOutput = JSON.parse(aiResponse.output_text); // { bugs: Array<{title, description, lines}> }
       const bugsArray = parsedOutput?.bugs ?? [];
       const bugsWithIds: Bug[] = bugsArray.map((b: Omit<Bug, "id">) => ({
-        id: crypto.randomUUID(),
+        // "https://api.github.com/repos/seraphimsakiewicz/evently/git/blobs/70898150ecd48d1e1b8f931378896baf0272c431"
+        id: codeFile.sha, //sha is 70898150ecd48d1e1b8f931378896baf0272c431 in this case
         title: b.title,
         description: b.description,
         lines: b.lines, // tuple [start, end]
@@ -158,7 +195,7 @@ await Promise.all(
       if (!result?.error) {
         console.log(
           `File analysis results for ${codeFile.path}: Mock sending to backend here ->`,
-          JSON.stringify(result)
+          JSON.stringify(result, null, "\t")
         );
       }
     })
