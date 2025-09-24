@@ -3,9 +3,8 @@ import {
   parseRepoUrl,
   fetchRepoFiles,
   filterCodeFiles,
-  type Bug,
   processFilesWithSocketProgress,
-} from "./utils";
+} from "./utils.ts";
 
 const io = new Server(3001, {
   cors: {
@@ -34,8 +33,6 @@ io.on("connection", (socket) => {
         message: `Found ${codeFiles.length} code files. Starting security analysis...`,
       });
 
-      const allBugs: Bug[] = [];
-
       // Process files with rate limiting and socket progress
       await processFilesWithSocketProgress(
         codeFiles,
@@ -48,7 +45,6 @@ io.on("connection", (socket) => {
 
       socket.emit("analysis-complete", {
         name: repoName,
-        bugs: allBugs,
         count: codeFiles.length,
       });
     } catch (error: any) {
