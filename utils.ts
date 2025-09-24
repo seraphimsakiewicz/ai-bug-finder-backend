@@ -190,6 +190,10 @@ export async function processFilesWithSocketProgress(
           message: `Processing ${codeFile.path}`,
         });
 
+        console.log("analysis-progress", {
+          message: `Processing ${codeFile.path}`,
+        });
+
         const result = await processFile(repoOwner, repoName, codeFile);
 
         if (!("error" in result)) {
@@ -202,6 +206,8 @@ export async function processFilesWithSocketProgress(
             filePath,
             bugs,
           });
+
+          console.log("file-analyzed", { filePath, bugs });
         }
       })
     )

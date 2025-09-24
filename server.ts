@@ -18,6 +18,7 @@ io.on("connection", (socket) => {
 
   socket.on("analyze-repo", async (repoUrl: string) => {
     try {
+      console.log("analysis-progress", { message: "Starting analysis..." });
       socket.emit("analysis-progress", { message: "Starting analysis..." });
 
       const { repoOwner, repoName } = parseRepoUrl(repoUrl);
@@ -25,11 +26,18 @@ io.on("connection", (socket) => {
       socket.emit("analysis-progress", {
         message: "Fetching repository files...",
       });
+      console.log("analysis-progress", {
+        message: "Fetching repository files...",
+      });
 
       const allFiles = await fetchRepoFiles(repoOwner, repoName);
       const codeFiles = filterCodeFiles(allFiles);
 
       socket.emit("analysis-progress", {
+        message: `Found ${codeFiles.length} code files. Starting security analysis...`,
+      });
+
+      console.log("analysis-progress", {
         message: `Found ${codeFiles.length} code files. Starting security analysis...`,
       });
 
@@ -42,8 +50,13 @@ io.on("connection", (socket) => {
       );
 
       socket.emit("analysis-progress", { message: "Analysis complete!" });
+      console.log("analysis-progress", { message: "Analysis complete!" });
 
       socket.emit("analysis-complete", {
+        name: repoName,
+        count: codeFiles.length,
+      });
+      console.log("analysis-complete", {
         name: repoName,
         count: codeFiles.length,
       });
