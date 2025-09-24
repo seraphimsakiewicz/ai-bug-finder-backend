@@ -1,5 +1,5 @@
 {
-  "type":"module",
+  "type": "module",
   "name": "ai-bug-finder-backend",
   "version": "1.0.0",
   "description": "",
@@ -15,7 +15,9 @@
   "dependencies": {
     "@octokit/rest": "^22.0.0",
     "openai": "^5.22.0",
-    "socket.io": "^4.8.1"
+    "p-limit": "^7.1.1",
+    "socket.io": "^4.8.1",
+    "zod": "^4.1.11"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",
