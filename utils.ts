@@ -82,7 +82,7 @@ async function processFile(
   repoOwner: string,
   repoName: string,
   codeFile: any
-): Promise<{ [key: string]: Bug[] } | { error: string }> {
+): Promise<{ bugs: Bug[] } | { error: string }> {
   try {
     const fileResponse = await octokit.rest.repos.getContent({
       owner: repoOwner,
@@ -158,16 +158,18 @@ async function processFile(
 
       const parsedOutput = JSON.parse(aiResponse.output_text);
       const bugsArray = parsedOutput?.bugs ?? [];
-      const bugsWithIds: Bug[] = bugsArray.map((b: Omit<Bug, "id">) => ({
-        id: codeFile.sha,
-        title: b.title,
-        description: b.description,
-        lines: b.lines,
-      }));
+      const bugsWithIds: Bug[] = bugsArray.map(
+        (b: Omit<Bug, "id">, index: number) => ({
+          id: `${codeFile.sha}_${index}`,
+          title: b.title,
+          description: b.description,
+          lines: b.lines,
+        })
+      );
 
-      return { [codeFile.path!]: bugsWithIds };
+      return { bugs: bugsWithIds };
     } else {
-      return { [codeFile.path!]: [] };
+      return { bugs: [] };
     }
   } catch (error: any) {
     console.error("Error fetching file content:", { error });
@@ -198,16 +200,20 @@ export async function processFilesWithSocketProgress(
 
         if (!("error" in result)) {
           // Extract bugs from result (result is { [filePath]: Bug[] })
-          const filePath = Object.keys(result)[0];
-          const bugs = result[filePath];
+          const bugs = result.bugs;
 
           // Emit individual file result
           socket.emit("file-analyzed", {
-            filePath,
+            filePath: codeFile.path,
             bugs,
+            id: codeFile.sha,
           });
 
-          console.log("file-analyzed", { filePath, bugs });
+          console.log("file-analyzed", {
+            filePath: codeFile.path,
+            bugs,
+            id: codeFile.sha,
+          });
         }
       })
     )
