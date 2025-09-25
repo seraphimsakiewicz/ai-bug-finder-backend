@@ -4,6 +4,7 @@ import {
   fetchRepoFiles,
   filterCodeFiles,
   processFilesWithSocketProgress,
+  getFileContent,
 } from "./utils.ts";
 
 const io = new Server(3001, {
@@ -62,6 +63,26 @@ io.on("connection", (socket) => {
       });
     } catch (error: any) {
       socket.emit("analysis-error", { error: error.message ?? String(error) });
+    }
+  });
+
+  socket.on("get-file-content", async ({ repoOwner, repoName, filePath }) => {
+    try {
+      console.log(`Fetching file content for: ${filePath}`);
+      const content = await getFileContent(repoOwner, repoName, filePath);
+
+      socket.emit("file-content-received", {
+        filePath,
+        content,
+      });
+
+      console.log(`File content sent for: ${filePath}`);
+    } catch (error: any) {
+      socket.emit("file-content-error", {
+        filePath,
+        error: error.message,
+      });
+      console.error(`Error fetching file content for ${filePath}:`, error.message);
     }
   });
 

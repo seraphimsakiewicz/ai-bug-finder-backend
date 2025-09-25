@@ -75,7 +75,7 @@ export function filterCodeFiles(files: any[]) {
     if (ignoredExtensions.some((ext) => path.endsWith(ext))) return false;
 
     return true;
-  });
+  }).slice(0,10)
 }
 
 async function processFile(
@@ -84,97 +84,102 @@ async function processFile(
   codeFile: any
 ): Promise<{ bugs: Bug[] } | { error: string }> {
   try {
-    const fileResponse = await octokit.rest.repos.getContent({
-      owner: repoOwner,
-      repo: repoName,
-      path: codeFile.path!,
-    });
+    const fileContent = await getFileContent(
+      repoOwner,
+      repoName,
+      codeFile.path
+    );
 
-    if (
-      !Array.isArray(fileResponse.data) &&
-      fileResponse.data.type === "file" &&
-      typeof codeFile.path === "string"
-    ) {
-      const fileContent = Buffer.from(
-        fileResponse.data.content,
-        "base64"
-      ).toString();
-
-      const aiResponse = await client.responses.create({
-        model: "gpt-5-nano",
-        input: [
-          {
-            role: "system",
-            content: "You are a code security auditor. Be concise and precise.",
-          },
-          {
-            role: "user",
-            content: [
-              "Analyze this code for security vulnerabilities.",
-              "Return an object { bugs: Bug[] }.",
-              "If none are found, return { bugs: [] }.",
-              "Each bug must include:",
-              "- title: short summary",
-              "- description: explanation of the bug",
-              "- lines: [start, end] line numbers (use the same value twice if the bug is on one line, e.g. [42,42])",
-              `\nFile path: ${codeFile.path}`,
-              `Code to analyze:\n${fileContent}`,
-            ].join("\n"),
-          },
-        ],
-        text: {
-          format: {
-            type: "json_schema",
-            name: "bugs_report",
-            schema: {
-              type: "object",
-              properties: {
-                bugs: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      title: { type: "string" },
-                      description: { type: "string" },
-                      lines: {
-                        type: "array",
-                        minItems: 2,
-                        maxItems: 2,
-                        items: { type: "integer", minimum: 1 },
-                      },
+    const aiResponse = await client.responses.create({
+      model: "gpt-5-nano",
+      input: [
+        {
+          role: "system",
+          content: "You are a code security auditor. Be concise and precise.",
+        },
+        {
+          role: "user",
+          content: [
+            "Analyze this code for security vulnerabilities.",
+            "Return an object { bugs: Bug[] }.",
+            "If none are found, return { bugs: [] }.",
+            "Each bug must include:",
+            "- title: short summary",
+            "- description: explanation of the bug",
+            "- lines: [start, end] line numbers (use the same value twice if the bug is on one line, e.g. [42,42])",
+            `\nFile path: ${codeFile.path}`,
+            `Code to analyze:\n${fileContent}`,
+          ].join("\n"),
+        },
+      ],
+      text: {
+        format: {
+          type: "json_schema",
+          name: "bugs_report",
+          schema: {
+            type: "object",
+            properties: {
+              bugs: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    title: { type: "string" },
+                    description: { type: "string" },
+                    lines: {
+                      type: "array",
+                      minItems: 2,
+                      maxItems: 2,
+                      items: { type: "integer", minimum: 1 },
                     },
-                    required: ["title", "description", "lines"],
-                    additionalProperties: false,
                   },
+                  required: ["title", "description", "lines"],
+                  additionalProperties: false,
                 },
               },
-              required: ["bugs"],
-              additionalProperties: false,
             },
-            strict: true,
+            required: ["bugs"],
+            additionalProperties: false,
           },
+          strict: true,
         },
-      });
+      },
+    });
 
-      const parsedOutput = JSON.parse(aiResponse.output_text);
-      const bugsArray = parsedOutput?.bugs ?? [];
-      const bugsWithIds: Bug[] = bugsArray.map(
-        (b: Omit<Bug, "id">, index: number) => ({
-          id: `${codeFile.sha}_${index}`,
-          title: b.title,
-          description: b.description,
-          lines: b.lines,
-        })
-      );
+    const parsedOutput = JSON.parse(aiResponse.output_text);
+    const bugsArray = parsedOutput?.bugs ?? [];
+    const bugsWithIds: Bug[] = bugsArray.map(
+      (b: Omit<Bug, "id">, index: number) => ({
+        id: `${codeFile.sha}_${index}`,
+        title: b.title,
+        description: b.description,
+        lines: b.lines,
+      })
+    );
 
-      return { bugs: bugsWithIds };
-    } else {
-      return { bugs: [] };
-    }
+    return { bugs: bugsWithIds };
   } catch (error: any) {
     console.error("Error fetching file content:", { error });
     return { error: error.message };
   }
+}
+
+export async function getFileContent(
+  repoOwner: string,
+  repoName: string,
+  filePath: string
+): Promise<string> {
+  const fileResponse = await octokit.rest.repos.getContent({
+    owner: repoOwner,
+    repo: repoName,
+    path: filePath,
+  });
+
+  if (!Array.isArray(fileResponse.data) && fileResponse.data.type === "file") {
+    return Buffer.from(fileResponse.data.content, "base64").toString();
+  }
+
+  throw new Error("File not found or is not a file");
 }
 
 export async function processFilesWithSocketProgress(
