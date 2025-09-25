@@ -9,7 +9,7 @@ import {
 
 const io = new Server(3001, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
     methods: ["GET", "POST"],
   },
 });

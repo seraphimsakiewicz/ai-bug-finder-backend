@@ -29,6 +29,7 @@ Edit `.env` and add your API keys:
 ```
 GITHUB_TOKEN=your_github_token_here
 OPENAI_API_KEY=your_openai_api_key_here
+FRONTEND_URL=http://localhost:3000
 ```
 
 4. Start the server:
