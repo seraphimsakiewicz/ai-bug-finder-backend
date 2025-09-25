@@ -20,6 +20,7 @@
     "zod": "^4.1.11"
   },
   "devDependencies": {
+    "@octokit/openapi-types": "^26.0.0",
     "@types/node": "^24.5.2",
     "dotenv": "^17.2.2",
     "ts-node": "^10.9.2",

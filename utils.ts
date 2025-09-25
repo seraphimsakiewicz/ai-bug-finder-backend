@@ -1,7 +1,9 @@
 import { Octokit } from "@octokit/rest";
+import { components } from "@octokit/openapi-types";
 import OpenAI from "openai";
 import pLimit from "p-limit";
 import dotenv from "dotenv";
+import { Socket } from "socket.io";
 dotenv.config();
 
 const octokit = new Octokit({
@@ -10,12 +12,31 @@ const octokit = new Octokit({
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-export type Bug = {
+type Bug = {
   id: string;
   title: string;
   description: string;
   lines: number[];
 };
+
+type GitTreeItem = {
+  path?: string;
+  mode?: string;
+  type?: string;
+  sha?: string;
+  size?: number;
+  url?: string;
+};
+
+type CodeFile = {
+  path: string;
+  type: string;
+  sha: string;
+  url?: string;
+  size?: number;
+};
+
+type GetTreeResponse = components["schemas"]["git-tree"];
 
 const ignoredDirs = [
   "node_modules/",
@@ -55,7 +76,10 @@ export function parseRepoUrl(repoUrl: string) {
   return { repoOwner, repoName };
 }
 
-export async function fetchRepoFiles(repoOwner: string, repoName: string) {
+export async function fetchRepoFiles(
+  repoOwner: string,
+  repoName: string
+): Promise<GetTreeResponse["tree"]> {
   const treeResponse = await octokit.rest.git.getTree({
     owner: repoOwner,
     repo: repoName,
@@ -65,23 +89,25 @@ export async function fetchRepoFiles(repoOwner: string, repoName: string) {
   return treeResponse.data.tree;
 }
 
-export function filterCodeFiles(files: any[]) {
-  return files.filter((file) => {
-    if (file.type !== "blob") return false;
+export function filterCodeFiles(files: CodeFile[]) {
+  return files
+    .filter((file) => {
+      if (file.type !== "blob") return false;
 
-    const path = file.path ?? "";
+      const path = file.path ?? "";
 
-    if (ignoredDirs.some((dir) => path.includes(dir))) return false;
-    if (ignoredExtensions.some((ext) => path.endsWith(ext))) return false;
+      if (ignoredDirs.some((dir) => path.includes(dir))) return false;
+      if (ignoredExtensions.some((ext) => path.endsWith(ext))) return false;
 
-    return true;
-  }).slice(0,10)
+      return true;
+    })
+    .slice(0, 5);
 }
 
 async function processFile(
   repoOwner: string,
   repoName: string,
-  codeFile: any
+  codeFile: CodeFile // make unknown and then do type gaurd
 ): Promise<{ bugs: Bug[] } | { error: string }> {
   try {
     const fileContent = await getFileContent(
@@ -183,10 +209,10 @@ export async function getFileContent(
 }
 
 export async function processFilesWithSocketProgress(
-  files: any[],
+  files: CodeFile[],
   repoOwner: string,
   repoName: string,
-  socket: any
+  socket: Socket
 ) {
   const limit = pLimit(13);
 
