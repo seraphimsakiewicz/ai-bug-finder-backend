@@ -90,15 +90,13 @@ export async function fetchRepoFiles(
 }
 
 export function filterCodeFiles(files: GitTreeItem[]): CodeFile[] {
-  return files
-    .filter((file): file is CodeFile => {
-      if (file.type !== "blob") return false;
-      const path = file.path ?? "";
-      if (ignoredDirs.some((dir) => path.includes(dir))) return false;
-      if (ignoredExtensions.some((ext) => path.endsWith(ext))) return false;
-      return !!(file.path && file.sha); // Ensure required properties exist
-    })
-    .slice(0, 5);
+  return files.filter((file): file is CodeFile => {
+    if (file.type !== "blob") return false;
+    const path = file.path ?? "";
+    if (ignoredDirs.some((dir) => path.includes(dir))) return false;
+    if (ignoredExtensions.some((ext) => path.endsWith(ext))) return false;
+    return !!(file.path && file.sha); // Ensure required properties exist
+  });
 }
 
 async function processFile(
