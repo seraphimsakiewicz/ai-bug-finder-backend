@@ -1,5 +1,5 @@
 import { Octokit } from "@octokit/rest";
-import { components } from "@octokit/openapi-types";
+import type { components } from "@octokit/openapi-types";
 import OpenAI from "openai";
 import pLimit from "p-limit";
 import dotenv from "dotenv";
@@ -89,17 +89,14 @@ export async function fetchRepoFiles(
   return treeResponse.data.tree;
 }
 
-export function filterCodeFiles(files: CodeFile[]) {
+export function filterCodeFiles(files: GitTreeItem[]): CodeFile[] {
   return files
-    .filter((file) => {
+    .filter((file): file is CodeFile => {
       if (file.type !== "blob") return false;
-
       const path = file.path ?? "";
-
       if (ignoredDirs.some((dir) => path.includes(dir))) return false;
       if (ignoredExtensions.some((ext) => path.endsWith(ext))) return false;
-
-      return true;
+      return !!(file.path && file.sha); // Ensure required properties exist
     })
     .slice(0, 5);
 }
